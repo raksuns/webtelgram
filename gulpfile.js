@@ -7,6 +7,8 @@ var path = require('path');
 var http = require('http');
 var livereload = require('gulp-livereload');
 var st = require('st');
+var less = require('gulp-less');
+var runSequence = require('run-sequence');
 
 // The generated file is being created at src
 // so it can be fetched by usemin.
@@ -37,6 +39,14 @@ gulp.task('imagemin', function() {
 		.pipe(gulp.dest('dist/img'));
 });
 
+gulp.task('less', function () {
+	gulp.src('app/less/*.less')
+		.pipe(less({
+			paths: [path.join(__dirname, 'less', 'includes')]
+		}))
+		.pipe(gulp.dest('app/css'));
+});
+
 gulp.task('copy-images', function() {
 	return gulp.src(['app/img/**/*', '!app/img/screenshot*', '!app/img/*.wav'])
 		.pipe(gulp.dest('dist/img'));
@@ -44,16 +54,12 @@ gulp.task('copy-images', function() {
 
 gulp.task('copy', function() {
 	return es.concat(
-		gulp.src(['app/favicon.ico',
-				'app/favicon_unread.ico',
-				'app/manifest.webapp',
-				'app/manifest.json',
-				'app/**/*worker.js'])
+		gulp.src(['app/favicon.ico', 'app/favicon_unread.ico', 'app/manifest.webapp', 'app/manifest.json', 'app/**/*worker.js'])
 			.pipe(gulp.dest('dist')),
 		gulp.src(['app/img/**/*.wav'])
 			.pipe(gulp.dest('dist/img')),
-		//gulp.src(['app/fonts/*'])
-		//	.pipe(gulp.dest('dist/fonts')),
+		// gulp.src(['app/fonts/*'])
+		//   .pipe(gulp.dest('dist/fonts')),
 		gulp.src(['app/js/lib/polyfill.js', 'app/js/lib/bin_utils.js'])
 			.pipe(gulp.dest('dist/js/lib')),
 		gulp.src('app/vendor/closure/long.js')
@@ -83,7 +89,6 @@ gulp.task('copy-locales', function() {
 		langpackSrc.push('app/js/locales/' + locale + '.json');
 		ngSrc.push('app/vendor/angular/i18n/angular-locale_' + locale + '.js');
 	});
-
 	return es.concat(
 		gulp.src(langpackSrc)
 			.pipe(gulp.dest('dist/js/locales/')),
@@ -119,7 +124,6 @@ gulp.task('update-version-comments', function() {
 		.pipe($.replace(/Webogram v[0-9.]*/, 'Webogram v' +  pj.version))
 		.pipe(gulp.dest('app'));
 });
-
 
 gulp.task('enable-production', function() {
 	return es.concat(
@@ -164,7 +168,8 @@ gulp.task('add-appcache-manifest', function() {
 				network: ['http://*', 'https://*', '*'],
 				filename: 'webogram.appcache',
 				exclude: ['webogram.appcache', 'app.manifest']
-			}))
+			})
+		)
 			.pipe(gulp.dest('./dist')),
 
 		gulp.src(sources)
@@ -173,56 +178,58 @@ gulp.task('add-appcache-manifest', function() {
 				network: ['http://*', 'https://*', '*'],
 				filename: 'app.manifest',
 				exclude: ['webogram.appcache', 'app.manifest']
-			}))
+			})
+		)
 			.pipe(gulp.dest('./dist'))
 	);
 });
-
 
 gulp.task('package-dev', function() {
 	return es.concat(
 		gulp.src('app/partials/*.html')
 			.pipe($.angularTemplatecache('templates.js', {
 				root: 'partials',
-       module: 'myApp.templates',
-       standalone: true
-     }))
-     .pipe(gulp.dest('dist_package/js')),
+				module: 'myApp.templates',
+				standalone: true
+			}))
+			.pipe(gulp.dest('dist_package/js')),
 
-    gulp.src(['app/favicon.ico', 'app/favicon_unread.ico', 'app/manifest.webapp', 'app/manifest.json'])
-		.pipe(gulp.dest('dist_package')),
-    gulp.src(['app/css/**/*'])
-		.pipe(gulp.dest('dist_package/css')),
-    gulp.src(['app/img/**/*'])
-		.pipe(gulp.dest('dist_package/img')),
+		gulp.src(['app/favicon.ico', 'app/favicon_unread.ico', 'app/manifest.webapp', 'app/manifest.json'])
+			.pipe(gulp.dest('dist_package')),
+		gulp.src(['app/css/**/*'])
+			.pipe(gulp.dest('dist_package/css')),
+		gulp.src(['app/img/**/*'])
+			.pipe(gulp.dest('dist_package/img')),
+		gulp.src('app/vendor/**/*')
+			.pipe(gulp.dest('dist_package/vendor')),
 
-	gulp.src('app/vendor/**/*')
-		.pipe(gulp.dest('dist_package/vendor')),
+		gulp.src('app/**/*.html')
+			.pipe($.replace(/PRODUCTION_ONLY_BEGIN/g, 'PRODUCTION_ONLY_BEGIN-->'))
+			.pipe($.replace(/PRODUCTION_ONLY_END/, '<!--PRODUCTION_ONLY_END'))
+			.pipe(gulp.dest('dist_package')),
 
-    gulp.src('app/**/*.html')
-      .pipe($.replace(/PRODUCTION_ONLY_BEGIN/g, 'PRODUCTION_ONLY_BEGIN-->'))
-      .pipe($.replace(/PRODUCTION_ONLY_END/, '<!--PRODUCTION_ONLY_END'))
-      .pipe(gulp.dest('dist_package')),
-
-    gulp.src('app/**/*.js')
-      .pipe($.ngmin())
-      .pipe($.replace(/PRODUCTION_ONLY_BEGIN(\*\/)?/g, 'PRODUCTION_ONLY_BEGIN*/'))
-      .pipe($.replace(/(\/\*)?PRODUCTION_ONLY_END/g, '/*PRODUCTION_ONLY_END'))
-      .pipe(gulp.dest('dist_package'))
-    );
+		gulp.src('app/**/*.js')
+			.pipe($.ngmin())
+			.pipe($.replace(/PRODUCTION_ONLY_BEGIN(\*\/)?/g, 'PRODUCTION_ONLY_BEGIN*/'))
+			.pipe($.replace(/(\/\*)?PRODUCTION_ONLY_END/g, '/*PRODUCTION_ONLY_END'))
+			.pipe(gulp.dest('dist_package'))
+	);
 });
 
 gulp.task('watchcss', function() {
-	gulp.src('app/css/*.css').pipe(livereload());
+	gulp.src('app/css/*.css')
+		.pipe(livereload());
 });
 
 gulp.task('watchhtml', function() {
-	gulp.src('app/partials/**/*.html').pipe(livereload());
+	gulp.src('app/partials/**/*.html')
+		.pipe(livereload());
 });
 
-gulp.task('watch', ['server'], function() {
+gulp.task('watch', ['server', 'less'], function() {
 	livereload.listen({ basePath: 'app' });
 	gulp.watch('app/css/*.css', ['watchcss']);
+	gulp.watch('app/less/**/*.less', ['less']);
 	gulp.watch('app/partials/**/*.html', ['watchhtml']);
 });
 
@@ -233,15 +240,20 @@ gulp.task('server', function(done) {
 });
 
 gulp.task('clean', function() {
-	return gulp.src(['dist/*', 'app/js/templates.js', '!dist/.git']).pipe($.clean());
+	return gulp.src(['dist/*', 'app/js/templates.js', 'app/css/*', '!dist/.git']).pipe($.clean());
 });
 
 gulp.task('bump', ['update-version-manifests', 'update-version-config'], function () {
 	gulp.start('update-version-comments');
 });
 
-gulp.task('build', ['usemin', 'copy', 'copy-locales', 'copy-images'], function () {
-	gulp.start('disable-production');
+gulp.task('build', function(callback) {
+	runSequence(
+		'less',
+		'usemin',
+		['copy', 'copy-locales', 'copy-images', 'disable-production'],
+		callback
+	);
 });
 
 gulp.task('package', ['cleanup-dist']);
